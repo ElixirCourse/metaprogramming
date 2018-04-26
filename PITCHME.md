@@ -23,6 +23,15 @@
 
 ---
 
+```
+# elixir/kernel.ex
+defmacro defmacro(call, expr \\ nil) do
+  define(:defmacro, call, expr, __CALLER__)
+end
+```
+
+---
+
 Или код, който пише код.
 (Добре де - това не е добра дефиниция)
 
