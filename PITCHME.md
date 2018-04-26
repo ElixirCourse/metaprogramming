@@ -87,6 +87,18 @@ join: i in OrderItems, on: i.order_id == o.id
 
 ---
 
+```
+get "/hello" do
+  send_resp(conn, 200, "world")
+end
+
+match _ do
+  send_resp(conn, 404, "oops")
+end
+```
+
+---
+
 ##### ExUnit
 
 ---
@@ -130,18 +142,6 @@ assert 5 < 4
 
 ---
 
-### Или `plug`:
-
-```
-get "/hello" do
-  send_resp(conn, 200, "world")
-end
-
-match _ do
-  send_resp(conn, 404, "oops")
-end
-```
----
 
 ### Ако това не ви е надъхало, спокойно имам още:
 
@@ -167,14 +167,13 @@ end
 
 ---
 
-## Elixir AST
-(quote/unquote)
+## Въведение в Elixir Abstract Syntax Tree
+
+  * междинен код по време на компилация
+  * имаме достъп до него и можем да го променяме чрез макроси
+  * можем да генерираме програмно AST и да го вмъкваме в модули
 
 –--
-
-Макросоти са нищо повече от функции, които взимат дадено AST и връщат друго.
-
----
 
 Всъщност, можем да видим абстрактното синтактично дърво(много е дълго) на всеки
 израз, чрез `quote`.
@@ -211,7 +210,7 @@ iex> quote do
            [
              [
                do: {:text, [],
-                ["Hello to our HTML DSL\n      end\n    end\n  end\nend\nend\nend\nend\nend\n"]}
+                ["Hello to our HTML DSL"]}
              ]
            ]}
         ]
@@ -263,6 +262,8 @@ iex(4)> quote do: x + 1
 ---
 
 #### unquote
+  * дава ни да оценим даден израз(AST) спрямо дадения контекст
+  * един вид интерполация
 
 ---
 
@@ -273,7 +274,15 @@ iex(5)> quote do: unquote(x) + 1
 
 ---
 
-Всъщност `unquote` взе AST и я интерпретира в текущия контекст.
+Можем да сме яки и да `unquote`-ваме извикване на функция:
+
+---
+
+```
+iex> fun = :hello
+iex> Macro.to_string(quote do: unquote(fun)(:world))
+"hello(:world)"
+```
 
 ---
 
@@ -288,10 +297,13 @@ iex(5)> quote do: unquote(x) + 1
 
 ## Макроси
 
+  * изпълняват се по време на компилация
+  * приемат AST
+  * връщат AST
+
 ---
 
-Всъщност това са просто функции, които взимат AST и връщат ново AST.
-С други думи - можем да правим каквото си искаме.
+### С други думи - влизаме в кода и правим каквото си искаме.
 
 ---
 
@@ -404,17 +416,111 @@ PS: Цъкни го.
 
 ---
 
+### Какво става, ако искаме да използваме променлива отвън?
+
+---
+
+## Чисти макроси
+
+  * всъщност, като пишем макроси не само генерираме код, ние го инжектираме в контекста
+  * контекстът държи локалния binding/scope, вмъкни модули и псевдоними
+  * по подразбиране не можем да променяме външния скоуп
+  * ако искаме - можем да ползваме `var!`
+
+---
+
+Пример:
+
+```
+iex(1)> ast = quote do
+...(1)>   if a == 42 do
+...(1)>     "The answer is?"
+...(1)>   else
+...(1)>     "Mehhh"
+...(1)>   end
+...(1)> end
+iex(2)> Code.eval_quoted ast, a: 42
+warning: variable "a" does not exist and is being expanded to "a()", please use parentheses to remove the ambiguity or chang
+e the variable name
+  nofile:1
+
+** (CompileError) nofile:1: undefined function a/0
+    (stdlib) lists.erl:1354: :lists.mapfoldl/3
+    (elixir) expanding macro: Kernel.if/2
+    nofile:1: (file)
+# BOOOOOOOOOM
+```
+
+---
+
+Въпреки, че инжектирахме променливата, Elixir не ни позволява да правим такива опасни неща.
+
+---
+
+## Нека го накараме да работи
+
+---
+
+```
+iex(1)> ast = quote do
+...(1)>   if var!(a) == 42 do
+...(1)>     "The answer is?"
+...(1)>   else
+...(1)>     "Mehhh"
+...(1)>   end
+...(1)> end
+{:if, [context: Elixir, import: Kernel],
+ [{:==, [context: Elixir, import: Kernel],
+   [{:var!, [context: Elixir, import: Kernel], [{:a, [], Elixir}]}, 42]},
+  [do: "The answer is?", else: "Mehhh"]]}
+iex(2)> Code.eval_quoted ast, a: 42
+{"The answer is?", [a: 42]}
+iex(3)> Code.eval_quoted ast, a: 1
+{"Mehhh", [a: 1]}
+```
+
+---
+
+### With great power comes great responsibility
+
+---
+
+Нека видим по-oпасен пример:
+
+```
+iex(1)> defmodule Dangerous do
+...(1)>   defmacro rename(new_name) do
+...(1)>     quote do
+...(1)>       var!(name) = unquote(new_name)
+...(1)>     end
+...(1)>   end
+...(1)> end
+{:module, Dangerous, .....
+iex(2)> require Dangerous
+Dangerous
+iex(3)> name = "Слави"
+"Слави"
+iex(4)> Dangerous.rename("Вало")
+"Вало"
+iex(5)> name
+"Вало"
+```
+
+---
+
 Имам няколко предизвикателства за вас:
 
 ---
 
 Макро, което дефинира макрото `def` просто да връща линията, на който е дефиниран даден файл.
+Hint: Kernel ще се скара, понеже е дефиниран `def` вече.
 
 ---
 
 Макро, което ни дава да имаме повече от 255 аргумента.
-PS: какво би било ast-то на `quote do: sum all 1, -1`
+Hint: какво би било ast-то на `quote do: sum all 1, -1`
 
 ---
 
-Демо html DSL
+Demo `while`/HTML DSL
+(ако стигнем до тук)
