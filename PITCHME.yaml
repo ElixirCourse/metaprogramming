@@ -1,0 +1,5 @@
+theme : white
+logo : assets/logo.png
+transition : none
+footnote : "ФМИ, Курс по Elixir."
+theme-override: assets/css/PITCHME.css
