@@ -682,9 +682,11 @@ quote do: sum all 1, -1
 
 ---
 
-Demo while
+Demo testing library(ExUnit subset)
+  * Assertion library
+  * Save defined tests
+  * Run defined tests
 
 ---
 
-Demo `while`/HTML DSL
-(ако стигнем до тук)
+
