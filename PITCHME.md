@@ -514,8 +514,6 @@ B.hello()
 
 Това е опция на `quote`, позволява ни това:
 
----
-
 ```
 defmodule Hello
   defmacro say(name)
