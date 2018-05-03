@@ -1,0 +1,2 @@
+defmodule QuikMathz do
+end

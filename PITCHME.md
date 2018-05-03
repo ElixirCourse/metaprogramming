@@ -434,18 +434,143 @@ PS: Цъкни го.
 
 ---
 
-Пример: `Evil`
+Пример: [ExActor](https://github.com/sasa1977/exactor) върху KittyServer
 
 ---
+
+Пример: `Evil QuikMathz`
+
+---
+
+#### __using__
+  * макро, което ни дава да дефинираме callback, когато някой ни използва модула
+
+---
+
+На кратко:
+
+---
+
+```
+defmodule SeeUsing do
+  use OurModule, option: "Hello"
+end
+```
+
+---
+
+Е същото като:
+
+---
+
+```
+defmodule SeeUsing do
+  require OurModule
+  OurModule.__using__(option: "Hello")
+end
+```
+
+---
+
+Да се върнем на QuikMathz и да го оправим.
+
+---
+
+[Other module callbacks](https://hexdocs.pm/elixir/Module.html)
+
+---
+
+##### За деня ще е важен @before_compile
+  * приема модул/{модул, кортеж}
+
+---
+
+Пример:
+
+---
+
+```
+defmodule A do
+  defmacro __before_compile__(_env) do
+    quote do
+      def hello, do: "world"
+    end
+  end
+end
+
+defmodule B do
+  @before_compile A
+end
+
+B.hello()
+#=> "world"
+```
+
+---
+
+
+#### bind_quoted
+
+---
+
+Това е опция на `quote`, позволява ни това:
+
+---
+
+```
+defmodule Hello
+  defmacro say(name)
+    quote bind_quoted: [name: name] do
+      "Здравей #{name}, как е?"
+    end
+  end
+end
+```
+
+---
+
+Вместо:
+
+```
+defmodule Hello
+  defmacro say(name)
+    quote do
+      "Здравей #{unquote(name)}, как е?"
+    end
+  end
+end
+```
+
+---
+
+И да сме сигурни, че не ви лъжа:
+
+```
+iex(1)> Hello.say("Ники")
+"Здравей Ники, как е?"
+iex(2)> name
+** (CompileError) iex:4: undefined function name/0
+```
+
+---
+
+[Пълен списък с опции на quote](https://hexdocs.pm/elixir/Kernel.SpecialForms.html#quote/2-options)
+
+---
+
+Пример вече за `use GenServer`
+
+---
+
 
 #### Какво става, ако искаме да използваме променлива отвън?
 
 ---
 
-##### Чисти макроси
+##### "Чисти" макроси
 
-  * всъщност, като пишем макроси не само генерираме код, ние го инжектираме в контекста
-  * контекстът държи локалния binding/scope, вмъкни модули и псевдоними
+  * всъщност, като пишем макроси не само генерираме код, ние го инжектираме в подадения контекст от извикващата функция
+  * контекстът държи локалния binding/scope, вмъкнати модули и псевдоними
   * по подразбиране не можем да променяме външния скоуп
   * ако искаме - можем да ползваме `var!`
 
@@ -454,14 +579,14 @@ PS: Цъкни го.
 Пример:
 
 ```
-iex(1)> ast = quote do
-...(1)>   if a == 42 do
-...(1)>     "The answer is?"
-...(1)>   else
-...(1)>     "Mehhh"
-...(1)>   end
-...(1)> end
-iex(2)> Code.eval_quoted ast, a: 42
+ast = quote do
+  if a == 42 do
+    "The answer is?"
+  else
+    "Mehhh"
+  end
+end
+Code.eval_quoted ast, a: 42
 warning: variable "a" does not exist and is being expanded to "a()", please use parentheses to remove the ambiguity or chang
 e the variable name
   nofile:1
@@ -484,48 +609,57 @@ e the variable name
 ---
 
 ```
-iex(1)> ast = quote do
-...(1)>   if var!(a) == 42 do
-...(1)>     "The answer is?"
-...(1)>   else
-...(1)>     "Mehhh"
-...(1)>   end
-...(1)> end
-{:if, [context: Elixir, import: Kernel],
- [{:==, [context: Elixir, import: Kernel],
-   [{:var!, [context: Elixir, import: Kernel], [{:a, [], Elixir}]}, 42]},
-  [do: "The answer is?", else: "Mehhh"]]}
-iex(2)> Code.eval_quoted ast, a: 42
-{"The answer is?", [a: 42]}
-iex(3)> Code.eval_quoted ast, a: 1
-{"Mehhh", [a: 1]}
+ast = quote do
+  if var!(a) == 42 do
+    "The answer is?"
+  else
+    "Mehhh"
+  end
+end
+Code.eval_quoted ast, a: 42
+# => {"The answer is?", [a: 42]}
+Code.eval_quoted ast, a: 1
+# => {"Mehhh", [a: 1]}
 ```
 
----
-
-With great power comes great responsibility
+---?image=assets/spiderman.jpeg&size=auto 90%
 
 ---
 
 Нека видим по-oпасен пример:
 
 ```
-iex(1)> defmodule Dangerous do
-...(1)>   defmacro rename(new_name) do
-...(1)>     quote do
-...(1)>       var!(name) = unquote(new_name)
-...(1)>     end
-...(1)>   end
-...(1)> end
-{:module, Dangerous, .....
-iex(2)> require Dangerous
-Dangerous
-iex(3)> name = "Слави"
-"Слави"
-iex(4)> Dangerous.rename("Вало")
-"Вало"
-iex(5)> name
-"Вало"
+defmodule Dangerous do
+  defmacro rename(new_name) do
+    quote do
+      var!(name) = unquote(new_name)
+    end
+  end
+end
+# => {:module, Dangerous, .....
+require Dangerous
+# => Dangerous
+name = "Слави"
+# => "Слави"
+Dangerous.rename("Вало")
+# => "Вало"
+name
+# => "Вало"
+```
+
+---
+
+Това има един много лош ефект:
+
+---
+
+```
+require Dangerous
+# => Dangerous
+Dangerous.rename("Вало")
+# => "Вало"
+name
+# => "Вало"
 ```
 
 ---
